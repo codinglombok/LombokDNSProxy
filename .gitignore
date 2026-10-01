@@ -1,0 +1,67 @@
+# LombokDNSProxy — .gitignore
+# Part of the Lombok Ecosystem · Apache 2.0 · @codinglombok
+
+# Build output
+dist/
+*.exe
+*.test
+coverage.out
+coverage.html
+
+# Go
+vendor/
+
+# Node / Browser extension
+node_modules/
+src/browser-ext/dist/
+src/browser-ext/dist-firefox/
+src/gui/frontend/dist/
+
+# Wails build output
+src/gui/build/
+src/gui/wailsjs/
+
+# Filter lists (downloaded at runtime, not committed)
+lists/adguard.txt
+lists/stevenblack.txt
+lists/oisd-big.txt
+lists/urlhaus.txt
+lists/easyprivacy.txt
+lists/blocklist.bin
+
+# Config overrides
+configs/local.yaml
+*.local.yaml
+
+# Secrets / keys
+*.pem
+*.key
+*.p12
+*.keystore
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test artifacts
+fuzz/
+testdata/
+tmp/
+
+# Log files
+*.log
+daemon.log
+
+# GoReleaser snapshot
+dist/
+/docs

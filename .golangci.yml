@@ -1,0 +1,142 @@
+# LombokDNSProxy — golangci-lint configuration
+# Run: golangci-lint run
+# Part of the Lombok Ecosystem · Apache 2.0 · @codinglombok
+
+run:
+  timeout: 5m
+  tests: true
+  build-tags:
+    - integration
+
+linters:
+  enable:
+    - errcheck          # check that errors are handled
+    - gosimple          # simplification suggestions
+    - govet             # go vet checks
+    - ineffassign       # detect ineffectual assignments
+    - staticcheck       # extensive static analysis
+    - unused            # detect unused code
+    - bodyclose         # check HTTP response body is closed
+    - contextcheck      # check that context is passed correctly
+    - durationcheck     # check for incorrect time.Duration multiplication
+    - exportloopref     # check for pointers to enclosing loop variables
+    - forcetypeassert   # require checked type assertions
+    - gocritic          # opinionated checks
+    - godot             # check comment formatting
+    - gofmt             # check formatting
+    - goimports         # check import grouping
+    - gosec             # security scanner
+    - misspell          # spell checker
+    - noctx             # check for http.Request without context
+    - nolintlint        # lint nolint directives
+    - prealloc          # suggest slice preallocation
+    - revive            # extensible linter
+    - rowserrcheck      # check rows.Err() is checked
+    - sqlclosecheck     # check sql.Rows/Stmt are closed
+    - unparam           # check for unused function params
+    - wastedassign      # detect wasted assignments
+
+  disable:
+    - exhaustive        # too noisy for this codebase
+    - exhaustruct       # requires all fields to be set — too strict
+    - gochecknoglobals  # we use some globals intentionally
+    - gocognit          # cognitive complexity — informational only
+    - godox             # TODO/FIXME — tracked in TECH_DEBT.md
+    - gomnd             # magic numbers — DNS protocol constants are fine
+    - lll               # line length — not enforced
+    - nlreturn          # blank line style — not enforced
+    - testpackage       # separate test package — not required
+    - wrapcheck         # error wrapping — too noisy
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false  # _ = f() is intentional in many DNS paths
+
+  govet:
+    enable-all: true
+    disable:
+      - shadow          # allow variable shadowing in tests
+
+  gosec:
+    excludes:
+      - G304  # file path from variable — intentional in config loading
+      - G306  # file permissions — 0644 for configs is intentional
+    config:
+      G101:
+        pattern: "(?i)(passwd|password|secret|token|apikey|api_key|credential)"
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+    disabled-checks:
+      - hugeParam       # DNS messages are passed by pointer already
+      - rangeValCopy    # acceptable in test code
+
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+      - name: package-comments
+        severity: warning
+      - name: var-naming
+        severity: error
+
+  misspell:
+    locale: US
+
+  goimports:
+    local-prefixes: github.com/codinglombok/lombok-dns-proxy
+
+  staticcheck:
+    checks:
+      - all
+      - -ST1000   # package comment — covered by revive
+      - -ST1003   # naming — covered by revive
+      - -SA4004   # loop always terminates — false positives in DNS parser
+
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+    allow-unused: false
+
+issues:
+  exclude-rules:
+    # Test files: allow some laxity
+    - path: "_test\\.go"
+      linters:
+        - errcheck
+        - gosec
+        - unparam
+
+    # Integration tests: allow skipping context propagation
+    - path: "tests/integration/"
+      linters:
+        - contextcheck
+        - noctx
+
+    # Fuzz targets: nolint is intentional
+    - path: "tests/fuzz/"
+      linters:
+        - errcheck
+
+    # CLI main: os.Exit is intentional
+    - path: "src/cli/main\\.go"
+      linters:
+        - gocritic
+
+    # PAC generator: uses fmt.Sprintf for JS template — not SQL injection
+    - path: "src/proxy/pac\\.go"
+      linters:
+        - gosec
+
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true

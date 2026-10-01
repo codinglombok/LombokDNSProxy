@@ -1,0 +1,9 @@
+# LombokDNSProxy — Custom Blocklist
+# Add your own domains here, one per line.
+# Supports: bare domains, wildcard (*.example.com), hosts-format, regex (/pattern/).
+# This file is never overwritten by auto-updates.
+#
+# Examples:
+#   ads.mybadsite.com
+#   *.tracker-network.net
+#   /^telemetry\..+\.com$/

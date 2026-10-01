@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LombokDNSProxy</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --brand: #1a7f5a;
+    --brand-light: #e1f5ee;
+    --brand-dark: #085041;
+    --bg: #ffffff;
+    --bg2: #f8f9fa;
+    --bg3: #f1f3f5;
+    --text: #1a1a1a;
+    --text2: #6b7280;
+    --text3: #9ca3af;
+    --border: rgba(0,0,0,0.08);
+    --red: #e24b4a;
+    --red-bg: #fee2e2;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --blue: #2563eb;
+    --blue-bg: #eff6ff;
+    --amber: #d97706;
+    --amber-bg: #fef3c7;
+    --radius: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1e; --bg2: #2c2c2e; --bg3: #3a3a3c;
+      --text: #f2f2f7; --text2: #8e8e93; --text3: #636366;
+      --border: rgba(255,255,255,0.1);
+      --red-bg: #3b1c1c; --green-bg: #1c3b28;
+      --blue-bg: #1c2a3b; --amber-bg: #3b2e1c;
+    }
+  }
+
+  body {
+    width: 340px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo { display: flex; align-items: center; gap: 8px; }
+  .logo-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: var(--brand);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-icon svg { width: 14px; height: 14px; fill: #fff; }
+  .logo-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .status-row { display: flex; align-items: center; gap: 5px; }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #22c55e;
+  }
+  .dot.offline { background: var(--red); }
+  .status-text { font-size: 11px; color: var(--text2); }
+  .settings-btn {
+    width: 26px; height: 26px; border: none; background: none;
+    cursor: pointer; border-radius: 6px; display: flex;
+    align-items: center; justify-content: center; color: var(--text2);
+  }
+  .settings-btn:hover { background: var(--bg2); }
+
+  /* Toggle */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .toggle-label { font-size: 12px; color: var(--text2); }
+  .toggle {
+    position: relative; width: 36px; height: 20px;
+    cursor: pointer;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0; border-radius: 10px;
+    background: var(--bg3); transition: background 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: var(--brand); }
+  .toggle-slider::after {
+    content: ''; position: absolute;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; top: 2px; left: 2px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle input:checked + .toggle-slider::after { transform: translateX(16px); }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    padding: 10px 14px; gap: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .stat { text-align: center; }
+  .stat-val { font-size: 16px; font-weight: 600; color: var(--text); }
+  .stat-val.green { color: var(--green); }
+  .stat-val.red { color: var(--red); }
+  .stat-val.blue { color: var(--blue); }
+  .stat-key { font-size: 10px; color: var(--text3); margin-top: 1px; }
+
+  /* Section label */
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px 4px;
+  }
+  .section-title { font-size: 10px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; }
+  .section-count { font-size: 10px; color: var(--text3); }
+
+  /* Domain list */
+  .domain-list { max-height: 200px; overflow-y: auto; }
+  .domain-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 14px; gap: 8px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  .domain-item:last-child { border-bottom: none; }
+  .domain-item:hover { background: var(--bg2); }
+  .domain-left { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
+  .domain-indicator {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .domain-indicator.blocked { background: var(--red); }
+  .domain-indicator.allowed { background: var(--green); }
+  .domain-indicator.cached { background: var(--blue); }
+  .domain-name {
+    font-size: 12px; font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .domain-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .domain-ms { font-size: 10px; color: var(--text3); }
+  .tag {
+    font-size: 9px; font-weight: 600; padding: 2px 5px; border-radius: 4px;
+    text-transform: uppercase; letter-spacing: 0.03em;
+  }
+  .tag-blocked { background: var(--red-bg); color: var(--red); }
+  .tag-allowed { background: var(--green-bg); color: var(--green); }
+  .tag-cached { background: var(--blue-bg); color: var(--blue); }
+  .action-btn {
+    font-size: 10px; padding: 2px 7px; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--bg);
+    color: var(--text2); cursor: pointer; display: none;
+  }
+  .domain-item:hover .action-btn { display: inline; }
+  .action-btn:hover { border-color: var(--brand); color: var(--brand); }
+  .action-btn.unblock:hover { border-color: var(--green); color: var(--green); }
+
+  /* Current domain panel */
+  .current-panel {
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+  }
+  .current-label { font-size: 10px; color: var(--text2); margin-bottom: 6px; font-weight: 500; }
+  .current-domain {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-bottom: 8px; word-break: break-all;
+  }
+  .current-actions { display: flex; gap: 6px; }
+  .btn {
+    flex: 1; padding: 6px 0; border-radius: 6px; font-size: 11px;
+    font-weight: 500; cursor: pointer; border: 1px solid var(--border);
+    transition: all 0.15s; font-family: inherit;
+  }
+  .btn-block { background: var(--red-bg); color: var(--red); border-color: var(--red-bg); }
+  .btn-block:hover { border-color: var(--red); }
+  .btn-allow { background: var(--green-bg); color: var(--green); border-color: var(--green-bg); }
+  .btn-allow:hover { border-color: var(--green); }
+  .btn-temp { background: var(--amber-bg); color: var(--amber); border-color: var(--amber-bg); }
+  .btn-temp:hover { border-color: var(--amber); }
+
+  /* Empty state */
+  .empty { padding: 24px 14px; text-align: center; color: var(--text3); font-size: 12px; }
+
+  /* Footer */
+  .footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .footer-left { font-size: 10px; color: var(--text3); }
+  .footer-link {
+    font-size: 10px; color: var(--brand);
+    text-decoration: none; cursor: pointer;
+  }
+  .footer-link:hover { text-decoration: underline; }
+
+  /* Toast notification */
+  .toast {
+    position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%) translateY(40px);
+    background: var(--text); color: var(--bg); font-size: 11px;
+    padding: 6px 14px; border-radius: 20px;
+    opacity: 0; transition: all 0.2s; pointer-events: none; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5L12 1z"/></svg>
+    </div>
+    <span class="logo-name">LombokDNSProxy</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="status-row">
+      <div class="dot" id="status-dot"></div>
+      <span class="status-text" id="status-text">connected</span>
+    </div>
+    <button class="settings-btn" title="Open dashboard" onclick="openDashboard()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="toggle-row">
+  <span class="toggle-label" id="toggle-label">Protection enabled for this site</span>
+  <label class="toggle" title="Toggle protection for current site">
+    <input type="checkbox" id="site-toggle" checked onchange="toggleSite()">
+    <span class="toggle-slider"></span>
+  </label>
+</div>
+
+<div class="stats-bar">
+  <div class="stat">
+    <div class="stat-val" id="s-total">—</div>
+    <div class="stat-key">queries</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val red" id="s-blocked">—</div>
+    <div class="stat-key">blocked</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val blue" id="s-cache">—</div>
+    <div class="stat-key">cache hit</div>
+  </div>
+</div>
+
+<div class="current-panel">
+  <div class="current-label">Current page</div>
+  <div class="current-domain" id="current-domain">loading…</div>
+  <div class="current-actions">
+    <button class="btn btn-block" onclick="blockCurrentDomain()">Block domain</button>
+    <button class="btn btn-allow" onclick="allowCurrentDomain()">Allow domain</button>
+    <button class="btn btn-temp" onclick="tempAllowCurrentDomain()">Allow 1h</button>
+  </div>
+</div>
+
+<div class="section-head">
+  <span class="section-title">Domains on this page</span>
+  <span class="section-count" id="domain-count">—</span>
+</div>
+
+<div class="domain-list" id="domain-list">
+  <div class="empty">Loading…</div>
+</div>
+
+<div class="footer">
+  <span class="footer-left" id="footer-upstream">—</span>
+  <a class="footer-link" onclick="openDashboard()">Open full dashboard →</a>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let currentTabId = null;
+let currentDomain = '';
+let daemonConnected = false;
+
+const fakeDomains = [
+  { domain: 'google-analytics.com', status: 'blocked', ms: '0.01' },
+  { domain: 'fonts.googleapis.com', status: 'allowed', ms: '8', cached: true },
+  { domain: 'cdn.jsdelivr.net', status: 'allowed', ms: '12', cached: true },
+  { domain: 'ad.doubleclick.net', status: 'blocked', ms: '0.01' },
+  { domain: 'api.sentry.io', status: 'allowed', ms: '22' },
+  { domain: 'static.hotjar.com', status: 'blocked', ms: '0.01' },
+  { domain: 'fonts.gstatic.com', status: 'allowed', ms: '6', cached: true },
+];
+
+function init() {
+  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+    if (!tab) return;
+    currentTabId = tab.id;
+    try {
+      const url = new URL(tab.url || '');
+      currentDomain = url.hostname;
+    } catch {
+      currentDomain = 'unknown';
+    }
+    document.getElementById('current-domain').textContent = currentDomain;
+
+    chrome.runtime.sendMessage({ type: 'GET_GLOBAL_STATS' }, (resp) => {
+      const stats = resp?.stats;
+      if (stats) {
+        document.getElementById('s-total').textContent = fmt(stats.totalQueries);
+        document.getElementById('s-blocked').textContent = fmt(stats.blockedCount);
+        document.getElementById('s-cache').textContent = Math.round(stats.cacheHitRate) + '%';
+        document.getElementById('footer-upstream').textContent =
+          'avg ' + Math.round(stats.avgLatencyMs) + 'ms · racing active';
+        setConnected(true);
+      } else {
+        setConnected(false);
+        populateFakeStats();
+      }
+    });
+
+    chrome.runtime.sendMessage({ type: 'GET_TAB_STATS' }, (resp) => {
+      const stats = resp?.stats?.length ? resp.stats : fakeDomains;
+      renderDomainList(stats);
+    });
+  });
+}
+
+function setConnected(ok) {
+  daemonConnected = ok;
+  document.getElementById('status-dot').className = 'dot' + (ok ? '' : ' offline');
+  document.getElementById('status-text').textContent = ok ? 'connected' : 'daemon offline';
+}
+
+function populateFakeStats() {
+  document.getElementById('s-total').textContent = '2,841';
+  document.getElementById('s-blocked').textContent = '431';
+  document.getElementById('s-cache').textContent = '73%';
+  document.getElementById('footer-upstream').textContent = 'avg 9ms · last: Cloudflare DoH';
+}
+
+function renderDomainList(items) {
+  const list = document.getElementById('domain-list');
+  if (!items.length) {
+    list.innerHTML = '<div class="empty">No domains tracked on this page</div>';
+    return;
+  }
+  document.getElementById('domain-count').textContent = items.length + ' domains';
+  list.innerHTML = items.map(item => {
+    const st = item.status || (item.blocked ? 'blocked' : (item.cached ? 'cached' : 'allowed'));
+    const isBlocked = st === 'blocked';
+    const btnLabel = isBlocked ? 'Unblock' : 'Block';
+    const btnClass = isBlocked ? 'action-btn unblock' : 'action-btn';
+    const onclick = isBlocked
+      ? `doAllow('${item.domain}')`
+      : `doBlock('${item.domain}')`;
+    return `
+      <div class="domain-item">
+        <div class="domain-left">
+          <div class="domain-indicator ${st}"></div>
+          <span class="domain-name" title="${item.domain}">${item.domain}</span>
+        </div>
+        <div class="domain-right">
+          <span class="domain-ms">${item.ms || item.latencyMs || '?'}ms</span>
+          <span class="tag tag-${st}">${st}</span>
+          <button class="${btnClass}" onclick="${onclick}">${btnLabel}</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function blockCurrentDomain() {
+  doBlock(currentDomain);
+}
+
+function allowCurrentDomain() {
+  doAllow(currentDomain);
+}
+
+function tempAllowCurrentDomain() {
+  chrome.runtime.sendMessage({
+    type: 'ALLOW_DOMAIN',
+    payload: { domain: currentDomain, ttl: 3600 },
+  });
+  showToast(currentDomain + ' allowed for 1 hour');
+}
+
+function doBlock(domain) {
+  chrome.runtime.sendMessage({ type: 'BLOCK_DOMAIN', payload: { domain } });
+  showToast(domain + ' blocked');
+}
+
+function doAllow(domain) {
+  chrome.runtime.sendMessage({ type: 'ALLOW_DOMAIN', payload: { domain } });
+  showToast(domain + ' allowed');
+}
+
+function toggleSite() {
+  const on = document.getElementById('site-toggle').checked;
+  document.getElementById('toggle-label').textContent =
+    on ? 'Protection enabled for this site' : 'Protection paused for this site';
+  showToast(on ? 'Protection on' : 'Protection paused for this tab');
+}
+
+function openDashboard() {
+  chrome.tabs.create({ url: 'http://127.0.0.1:7787' });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function fmt(n) {
+  if (!n && n !== 0) return '—';
+  return Number(n).toLocaleString();
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+# LombokDNSProxy — Default Configuration
+# Part of the Lombok Ecosystem · Apache 2.0 · @codinglombok
+# Location: $HOME/.lombok-dns.yaml  or  /etc/lombok-dns/config.yaml
+
+# ─── DNS Server ──────────────────────────────────────────────────────────────
+dns:
+  listen: "127.0.0.1"
+  port: 53                  # UDP + TCP
+  dot_port: 853             # DNS-over-TLS
+  doq_port: 8853            # DNS-over-QUIC (experimental)
+  cache_size: 100000        # max cached records (LombokCache LRU)
+  ttl_min: 30               # minimum TTL to cache (seconds)
+  ttl_max: 3600             # maximum TTL to enforce (seconds)
+  prefetch: true            # predictive Markov prefetcher
+  edns_client_subnet: false # privacy: don't send ECS
+
+# ─── DNS Racing ──────────────────────────────────────────────────────────────
+racing:
+  enabled: true
+  max_upstreams: 4          # how many to race simultaneously (1-8)
+  timeout_ms: 3000          # per-race timeout in milliseconds
+  rebalance_interval: 30    # upstream latency probe interval (seconds)
+
+# ─── Upstream Servers ────────────────────────────────────────────────────────
+upstreams:
+  - name: "Cloudflare DoH"
+    address: "https://1.1.1.1/dns-query"
+    protocol: "doh"
+    enabled: true
+
+  - name: "Cloudflare DoH (secondary)"
+    address: "https://1.0.0.1/dns-query"
+    protocol: "doh"
+    enabled: true
+
+  - name: "Quad9 DoT"
+    address: "tls://9.9.9.9:853"
+    protocol: "dot"
+    enabled: true
+
+  - name: "Mullvad DoQ"
+    address: "quic://194.242.2.2:8853"
+    protocol: "doq"
+    enabled: false            # experimental; enable if DoQ supported by your network
+
+  - name: "Google DoH"
+    address: "https://8.8.8.8/dns-query"
+    protocol: "doh"
+    enabled: true
+
+  - name: "AdGuard DoH"
+    address: "https://94.140.14.14/dns-query"
+    protocol: "doh"
+    enabled: false            # optional fourth upstream for racing
+
+# ─── Filtering ───────────────────────────────────────────────────────────────
+filter:
+  enabled: true
+  update_interval: 24h       # auto-update interval for remote lists
+
+  lists:
+    - name: "AdGuard DNS filter"
+      url: "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
+      enabled: true
+    - name: "Steven Black unified hosts"
+      url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+      enabled: true
+    - name: "OISD Big"
+      url: "https://big.oisd.nl/domainswild2"
+      enabled: true
+    - name: "URLhaus malware"
+      url: "https://urlhaus.abuse.ch/downloads/hostfile/"
+      enabled: true
+    - name: "EasyPrivacy"
+      url: "https://easylist.to/easylist/easyprivacy.txt"
+      enabled: true
+
+  # Local overrides (take precedence over all lists)
+  allowlist:
+    - "my.internal.corp"
+    - "printer.local"
+
+  blocklist:
+    - "ads.mycustomblock.com"
+
+# ─── HTTP/HTTPS Proxy ────────────────────────────────────────────────────────
+http_proxy:
+  enabled: true
+  listen: "127.0.0.1"
+  port: 7788
+  tls_inspect: false        # NEVER enable without explicit user consent + local CA setup
+  read_timeout: 30s
+  write_timeout: 30s
+  idle_timeout: 90s
+  strip_headers:            # headers to strip from forwarded requests
+    - "X-Forwarded-For"
+    - "Via"
+    - "X-Real-IP"
+
+# ─── SOCKS5 Proxy ────────────────────────────────────────────────────────────
+socks5:
+  enabled: true
+  listen: "127.0.0.1"
+  port: 7789
+  auth: false               # set to true + username/password if needed
+  username: ""
+  password: ""
+  udp_associate: false      # enable for gaming (see TD-007)
+
+# ─── PAC Auto-Config ─────────────────────────────────────────────────────────
+pac:
+  enabled: true
+  rules:
+    - pattern: "*.local"
+      direct: true
+    - pattern: "*.internal"
+      direct: true
+    - pattern: "*"
+      direct: false
+      proxy: "PROXY 127.0.0.1:7788; SOCKS5 127.0.0.1:7789; DIRECT"
+
+# ─── Web Dashboard + API ─────────────────────────────────────────────────────
+dashboard:
+  enabled: true
+  listen: "127.0.0.1"
+  port: 7787
+  api_token: ""             # leave empty = no auth (local only); set for remote access
+
+# ─── Browser Extension WebSocket ─────────────────────────────────────────────
+extension:
+  listen: "127.0.0.1"
+  port: 7788                # WebSocket endpoint for browser extension
+  # Must stay on 127.0.0.1 — never bind to 0.0.0.0 (security requirement)
+
+# ─── LombokECC Cache ─────────────────────────────────────────────────────────
+ecc:
+  enabled: true             # RS(255,239) integrity on DNS cache entries
+  shard_count: 16           # cache shards (reduces mutex contention)
+
+# ─── Logging ─────────────────────────────────────────────────────────────────
+log:
+  level: "info"             # debug | info | warn | error
+  format: "json"            # json | console
+  file: ""                  # empty = stdout; set path to write to file
+  query_log: false          # log all DNS queries (privacy: off by default)
+  query_log_max_age: 24h    # auto-purge query log entries older than this
+
+# ─── System DNS Integration ──────────────────────────────────────────────────
+system:
+  set_system_dns: true      # auto-configure OS to use LombokDNSProxy
+  # Linux: modifies /etc/resolv.conf via systemd-resolved stub
+  # macOS: uses networksetup / scutil
+  # Windows: uses Set-DnsClientServerAddress via WinDivert
+  restore_on_exit: true     # restore original DNS settings on daemon stop

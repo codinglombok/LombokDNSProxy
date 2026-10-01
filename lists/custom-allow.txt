@@ -1,0 +1,9 @@
+# LombokDNSProxy — Custom Allowlist
+# Domains listed here are NEVER blocked, even if they appear on a blocklist.
+# Add internal/corporate domains, printers, NAS hostnames, etc.
+# This file is never overwritten by auto-updates.
+#
+# Examples:
+#   my-nas.local
+#   printer.office.internal
+#   safe-analytics.mycompany.com

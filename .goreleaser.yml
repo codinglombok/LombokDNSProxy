@@ -1,0 +1,153 @@
+# LombokDNSProxy — GoReleaser Configuration
+# Part of the Lombok Ecosystem · Apache 2.0 · @codinglombok
+# Run: goreleaser release --clean
+
+version: 2
+
+project_name: lombok-dns-proxy
+
+before:
+  hooks:
+    - go mod tidy
+    - task lists:update
+    - task lists:compile
+    - task build:ext
+
+builds:
+  - id: cli
+    main: ./src/cli/main.go
+    binary: lombok-dns
+    goos:   [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    goarm:  ["7"]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/codinglombok/lombok-dns-proxy/internal/build.Version={{.Version}}
+      - -X github.com/codinglombok/lombok-dns-proxy/internal/build.BuildTime={{.Date}}
+      - -X github.com/codinglombok/lombok-dns-proxy/internal/build.GitCommit={{.ShortCommit}}
+
+  - id: cli-mips
+    main: ./src/cli/main.go
+    binary: lombok-dns
+    goos:   [linux]
+    goarch: [mipsle]
+    gomips: [softfloat]
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/codinglombok/lombok-dns-proxy/internal/build.Version={{.Version}}
+
+archives:
+  - id: default
+    builds: [cli]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+      - configs/default.yaml
+      - lists/custom-block.txt
+      - lists/custom-allow.txt
+
+  - id: mips
+    builds: [cli-mips]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_linux_mipsle_softfloat"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user={{ .Env.GPG_FINGERPRINT }}"
+      - "--output=${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: codinglombok
+    name:  lombok-dns-proxy
+  name_template: "{{ .ProjectName }} {{ .Version }}"
+  header: |
+    ## LombokDNSProxy {{ .Version }}
+
+    Part of the Lombok Ecosystem · Apache 2.0 · [@codinglombok](https://github.com/codinglombok)
+
+    **Install:**
+    ```bash
+    curl -sSL https://install.lombokdns.dev | bash
+    ```
+  footer: |
+    **Full changelog**: https://github.com/codinglombok/lombok-dns-proxy/compare/{{ .PreviousTag }}...{{ .Tag }}
+
+brews:
+  - name: lombok-dns-proxy
+    repository:
+      owner: codinglombok
+      name:  homebrew-tap
+    directory: Formula
+    description: "Privacy-first DNS proxy + ad blocker · Lombok Ecosystem"
+    license: "Apache-2.0"
+    homepage: "https://github.com/codinglombok/lombok-dns-proxy"
+    install: |
+      bin.install "lombok-dns"
+    service: |
+      run [opt_bin/"lombok-dns", "start", "--config", "#{etc}/lombok-dns/config.yaml"]
+      keep_alive true
+      log_path var/"log/lombok-dns.log"
+      error_log_path var/"log/lombok-dns.log"
+    test: |
+      system "#{bin}/lombok-dns", "version"
+
+dockers:
+  - image_templates:
+      - "codinglombok/lombok-dns-proxy:{{ .Version }}-amd64"
+    use: buildx
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--build-arg=VERSION={{ .Version }}"
+      - "--build-arg=BUILD_TIME={{ .Date }}"
+    dockerfile: Dockerfile
+
+  - image_templates:
+      - "codinglombok/lombok-dns-proxy:{{ .Version }}-arm64"
+    use: buildx
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--build-arg=VERSION={{ .Version }}"
+
+docker_manifests:
+  - name_template: "codinglombok/lombok-dns-proxy:{{ .Version }}"
+    image_templates:
+      - "codinglombok/lombok-dns-proxy:{{ .Version }}-amd64"
+      - "codinglombok/lombok-dns-proxy:{{ .Version }}-arm64"
+
+  - name_template: "codinglombok/lombok-dns-proxy:latest"
+    image_templates:
+      - "codinglombok/lombok-dns-proxy:{{ .Version }}-amd64"
+      - "codinglombok/lombok-dns-proxy:{{ .Version }}-arm64"

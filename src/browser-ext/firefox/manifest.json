@@ -1,0 +1,66 @@
+{
+  "manifest_version": 2,
+  "name": "LombokDNSProxy",
+  "version": "1.0.0",
+  "description": "Privacy-first DNS proxy and ad blocker powered by the Lombok Ecosystem",
+  "author": "@codinglombok",
+  "homepage_url": "https://github.com/codinglombok/lombok-dns-proxy",
+
+  "permissions": [
+    "storage",
+    "tabs",
+    "activeTab",
+    "webRequest",
+    "webRequestBlocking",
+    "proxy",
+    "nativeMessaging",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "scripts": ["firefox/background-mv2.ts"],
+    "persistent": true
+  },
+
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "32":  "icons/icon32.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "LombokDNSProxy"
+  },
+
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.ts"],
+      "run_at": "document_start",
+      "all_frames": false
+    }
+  ],
+
+  "web_accessible_resources": [
+    "icons/*.png"
+  ],
+
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "lombok-dns-proxy@codinglombok.dev",
+      "strict_min_version": "109.0"
+    }
+  }
+}

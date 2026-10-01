@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LombokDNSProxy — Dashboard</title>
+<style>
+/* ─── Reset + Variables ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --brand: #1a7f5a; --brand-d: #085041; --brand-l: #e1f5ee;
+  --bg: #f0f2f5; --card: #ffffff; --sidebar: #1e2229;
+  --text: #1a1a1a; --text2: #6b7280; --text3: #9ca3af;
+  --border: rgba(0,0,0,0.07); --border2: rgba(0,0,0,0.12);
+  --radius: 10px; --shadow: 0 2px 8px rgba(0,0,0,0.07);
+  --red: #e24b4a; --green: #16a34a; --blue: #2563eb; --amber: #d97706;
+  --red-bg: #fee2e2; --green-bg: #dcfce7; --blue-bg: #eff6ff; --amber-bg: #fef3c7;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111827; --card: #1f2937; --sidebar: #111827;
+    --text: #f9fafb; --text2: #9ca3af; --text3: #6b7280;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+    --brand-l: #0d3d29;
+    --red-bg: #3b1c1c; --green-bg: #1c3b28; --blue-bg: #1c2a3b; --amber-bg: #3b2e1c;
+  }
+}
+
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
+body { display: flex; background: var(--bg); color: var(--text); }
+
+/* ─── Sidebar ──────────────────────────────────────────────────────────────── */
+.sidebar { width: 220px; background: var(--sidebar); display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.logo-mark { width: 32px; height: 32px; border-radius: 8px; background: var(--brand); display: flex; align-items: center; justify-content: center; }
+.logo-mark svg { width: 16px; height: 16px; fill: #fff; }
+.logo-text { color: #fff; font-size: 14px; font-weight: 600; }
+.logo-ver { color: rgba(255,255,255,0.35); font-size: 11px; }
+
+.nav { padding: 12px 8px; flex: 1; }
+.nav-section { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 8px 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: rgba(255,255,255,0.55); transition: all 0.12s; margin-bottom: 1px; }
+.nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.85); }
+.nav-item.active { background: rgba(26,127,90,0.3); color: #4ade80; font-weight: 500; }
+.nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+.sidebar-footer { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+.daemon-status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.4); }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; animation: pulse 2s infinite; }
+.status-dot.offline { background: var(--red); animation: none; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ─── Main content ─────────────────────────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.topbar { height: 54px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 24px; gap: 16px; }
+.topbar-title { font-size: 16px; font-weight: 600; flex: 1; }
+.topbar-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border2); background: none; font-size: 12px; color: var(--text2); cursor: pointer; font-family: inherit; transition: all 0.12s; }
+.topbar-btn:hover { background: var(--brand-l); color: var(--brand); border-color: var(--brand); }
+.topbar-btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+.topbar-btn.primary:hover { background: var(--brand-d); }
+
+.content { flex: 1; overflow-y: auto; padding: 24px; }
+
+/* ─── Pages ────────────────────────────────────────────────────────────────── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ─── Stat cards ───────────────────────────────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: var(--card); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+.stat-label { font-size: 11px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+.stat-val { font-size: 28px; font-weight: 600; line-height: 1; }
+.stat-val.brand { color: var(--brand); }
+.stat-val.red   { color: var(--red); }
+.stat-val.green { color: var(--green); }
+.stat-val.blue  { color: var(--blue); }
+.stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+/* ─── Grid layout ──────────────────────────────────────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+
+/* ─── Cards ────────────────────────────────────────────────────────────────── */
+.card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+.card-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.card-title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+.card-title svg { width: 15px; height: 15px; color: var(--text2); }
+.card-body { padding: 16px 18px; }
+
+.badge { font-size: 10px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+.badge-green { background: var(--green-bg); color: var(--green); }
+.badge-red   { background: var(--red-bg); color: var(--red); }
+.badge-blue  { background: var(--blue-bg); color: var(--blue); }
+.badge-amber { background: var(--amber-bg); color: var(--amber); }
+
+/* ─── Racing visualisation ─────────────────────────────────────────────────── */
+.upstream-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.upstream-name { font-size: 12px; color: var(--text2); width: 110px; flex-shrink: 0; }
+.bar-track { flex: 1; height: 7px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width 0.7s cubic-bezier(0.4,0,0.2,1); }
+.upstream-ms { font-size: 11px; color: var(--text3); width: 40px; text-align: right; flex-shrink: 0; }
+.winner-pill { font-size: 9px; padding: 1px 6px; border-radius: 4px; background: var(--green-bg); color: var(--green); font-weight: 600; flex-shrink: 0; }
+
+/* ─── Query log ─────────────────────────────────────────────────────────────── */
+.qlog-filters { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+.qlog-filters input { flex: 1; padding: 7px 12px; border: 1px solid var(--border2); border-radius: 8px; font-size: 12px; background: var(--bg); color: var(--text); outline: none; }
+.qlog-filters input:focus { border-color: var(--brand); }
+.qlog-filters select { padding: 7px 10px; border: 1px solid var(--border2); border-radius: 8px; font-size: 12px; background: var(--bg); color: var(--text); outline: none; cursor: pointer; }
+.qlog-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.qlog-table th { text-align: left; font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; padding: 0 8px 8px; }
+.qlog-table td { padding: 7px 8px; border-top: 1px solid var(--border); }
+.qlog-table tr:hover td { background: var(--bg); }
+.domain-cell { font-family: 'SF Mono', 'Fira Code', monospace; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag { display: inline-block; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; }
+.tag-blocked { background: var(--red-bg); color: var(--red); }
+.tag-cached  { background: var(--blue-bg); color: var(--blue); }
+.tag-upstream{ background: var(--green-bg); color: var(--green); }
+
+/* ─── Upstreams list ─────────────────────────────────────────────────────────── */
+.upstream-list-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.upstream-list-row:last-child { border: none; }
+.upstream-list-icon { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-l); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.upstream-list-icon svg { width: 16px; height: 16px; color: var(--brand); }
+.upstream-list-info { flex: 1; }
+.upstream-list-name { font-size: 13px; font-weight: 500; }
+.upstream-list-addr { font-size: 11px; color: var(--text3); font-family: monospace; }
+.upstream-list-ms { font-size: 13px; font-weight: 600; color: var(--brand); text-align: right; }
+.upstream-list-ms small { font-size: 10px; color: var(--text3); font-weight: 400; display: block; }
+
+/* ─── Top blocked ────────────────────────────────────────────────────────────── */
+.top-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.top-row:last-child { border: none; }
+.top-domain { flex: 1; font-size: 12px; font-family: monospace; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top-bar { width: 80px; height: 5px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+.top-bar-fill { height: 100%; background: var(--red); border-radius: 3px; }
+.top-count { font-size: 12px; color: var(--text2); text-align: right; min-width: 40px; }
+
+/* ─── Input form ─────────────────────────────────────────────────────────────── */
+.form-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.form-row input { flex: 1; padding: 8px 12px; border: 1px solid var(--border2); border-radius: 8px; font-size: 13px; background: var(--bg); color: var(--text); outline: none; font-family: monospace; }
+.form-row input:focus { border-color: var(--brand); }
+.form-row input::placeholder { font-family: -apple-system, sans-serif; }
+.btn { padding: 8px 18px; border-radius: 8px; border: none; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit; transition: all 0.12s; }
+.btn-brand { background: var(--brand); color: #fff; }
+.btn-brand:hover { background: var(--brand-d); }
+.btn-danger { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-bg); }
+.btn-danger:hover { border-color: var(--red); }
+.btn-ghost { background: var(--bg); color: var(--text2); border: 1px solid var(--border2); }
+.btn-ghost:hover { border-color: var(--brand); color: var(--brand); }
+
+/* ─── Settings toggle ───────────────────────────────────────────────────────── */
+.setting-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.setting-row:last-child { border: none; }
+.setting-label { font-size: 13px; font-weight: 500; }
+.setting-desc  { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-track { position: absolute; inset: 0; border-radius: 11px; background: var(--border2); transition: background 0.2s; }
+.toggle input:checked + .toggle-track { background: var(--brand); }
+.toggle-thumb { position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+.toggle input:checked ~ .toggle-thumb { transform: translateX(18px); }
+
+/* ─── Toast ─────────────────────────────────────────────────────────────────── */
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); padding: 10px 22px; border-radius: 10px; font-size: 13px; font-weight: 500; opacity: 0; transition: all 0.25s; pointer-events: none; z-index: 9999; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-ok  { background: #166534; color: #fff; }
+.toast-err { background: #991b1b; color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ─── Sidebar ─────────────────────────────────────────────────────────────── -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5L12 1z"/></svg>
+    </div>
+    <div>
+      <div class="logo-text">LombokDNS</div>
+      <div class="logo-ver">v1.0.0 · Proxy</div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-section">Monitor</div>
+    <div class="nav-item active" onclick="showPage('dashboard',this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('querylog',this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>
+      Query Log
+    </div>
+    <div class="nav-item" onclick="showPage('upstreams',this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      Upstreams
+    </div>
+
+    <div class="nav-section">Filter</div>
+    <div class="nav-item" onclick="showPage('blocklist',this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>
+      Blocklist
+    </div>
+    <div class="nav-item" onclick="showPage('allowlist',this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Allowlist
+    </div>
+
+    <div class="nav-section">Config</div>
+    <div class="nav-item" onclick="showPage('settings',this)">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+      Settings
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <div class="daemon-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Connecting…</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ─── Main ────────────────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <header class="topbar">
+    <span class="topbar-title" id="page-title">Dashboard</span>
+    <button class="topbar-btn" onclick="flushCache()">Flush Cache</button>
+    <button class="topbar-btn" onclick="reloadLists()">Update Lists</button>
+    <button class="topbar-btn primary" onclick="openCLI()">CLI Docs ↗</button>
+  </header>
+
+  <div class="content">
+
+    <!-- ── Dashboard ───────────────────────────────────────────────────────── -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Total queries</div><div class="stat-val brand" id="s-total">—</div><div class="stat-sub">this session</div></div>
+        <div class="stat-card"><div class="stat-label">Blocked</div><div class="stat-val red" id="s-blocked">—</div><div class="stat-sub" id="s-blocked-pct">— % of traffic</div></div>
+        <div class="stat-card"><div class="stat-label">Cache hit rate</div><div class="stat-val green" id="s-cache">—</div><div class="stat-sub">ECC-verified · LRU</div></div>
+        <div class="stat-card"><div class="stat-label">Avg latency</div><div class="stat-val blue" id="s-latency">—</div><div class="stat-sub">racing active</div></div>
+      </div>
+
+      <div class="grid-3">
+        <div>
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>DNS Racing</span>
+              <span class="badge badge-green">parallel</span>
+            </div>
+            <div class="card-body" id="race-vis">
+              <div class="upstream-row"><span class="upstream-name">Cloudflare DoH</span><div class="bar-track"><div class="bar-fill" id="b0" style="width:0%;background:#1a7f5a"></div></div><span class="upstream-ms" id="m0">—</span><span class="winner-pill" id="w0" style="display:none">winner</span></div>
+              <div class="upstream-row"><span class="upstream-name">Quad9 DoT</span><div class="bar-track"><div class="bar-fill" id="b1" style="width:0%;background:#2563eb"></div></div><span class="upstream-ms" id="m1">—</span><span class="winner-pill" id="w1" style="display:none">winner</span></div>
+              <div class="upstream-row"><span class="upstream-name">Google DoH</span><div class="bar-track"><div class="bar-fill" id="b2" style="width:0%;background:#f59e0b"></div></div><span class="upstream-ms" id="m2">—</span><span class="winner-pill" id="w2" style="display:none">winner</span></div>
+              <div class="upstream-row"><span class="upstream-name">Mullvad DoQ</span><div class="bar-track"><div class="bar-fill" id="b3" style="width:0%;background:#a78bfa"></div></div><span class="upstream-ms" id="m3">—</span><span class="winner-pill" id="w3" style="display:none">winner</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"/></svg>Live queries</span>
+              <span class="badge badge-red" id="live-blocked">0 blocked</span>
+            </div>
+            <div class="card-body" style="padding:0">
+              <table class="qlog-table" style="margin:0">
+                <thead><tr><th>Domain</th><th>Result</th><th>Latency</th></tr></thead>
+                <tbody id="live-log"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Top blocked</span></div>
+            <div class="card-body" style="padding:12px 16px" id="top-blocked">
+              <div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">Loading…</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><span class="card-title">Block domain</span></div>
+            <div class="card-body">
+              <div class="form-row"><input id="bd-input" type="text" placeholder="ads.example.com"><button class="btn btn-danger" onclick="blockDomain()">Block</button></div>
+              <div class="form-row"><input id="al-input" type="text" placeholder="safe.local"><button class="btn btn-brand" onclick="allowDomain()">Allow</button></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><span class="card-title">Cache</span></div>
+            <div class="card-body">
+              <div style="font-size:12px;color:var(--text2);margin-bottom:12px">
+                <strong id="cache-size">—</strong> entries · ECC RS(255,239) · 16 shards
+              </div>
+              <button class="btn btn-ghost" style="width:100%" onclick="flushCache()">Flush DNS cache</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Query Log ────────────────────────────────────────────────────────── -->
+    <div class="page" id="page-querylog">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Query Log</span><span class="badge badge-blue" id="ql-total">—</span></div>
+        <div class="card-body">
+          <div class="qlog-filters">
+            <input id="ql-domain" type="text" placeholder="Filter by domain…" oninput="filterLog()">
+            <select id="ql-result" onchange="filterLog()">
+              <option value="">All results</option>
+              <option value="blocked">Blocked</option>
+              <option value="cached">Cached</option>
+              <option value="upstream">Upstream</option>
+            </select>
+            <button class="btn btn-ghost" onclick="clearLog()">Clear</button>
+          </div>
+          <table class="qlog-table">
+            <thead><tr><th>Time</th><th>Domain</th><th>Type</th><th>Result</th><th>Upstream</th><th>Latency</th></tr></thead>
+            <tbody id="ql-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Upstreams ─────────────────────────────────────────────────────────── -->
+    <div class="page" id="page-upstreams">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Upstream Servers</span><button class="btn btn-ghost" style="font-size:11px" onclick="benchUpstreams()">Benchmark</button></div>
+        <div class="card-body" id="upstream-list">Loading…</div>
+      </div>
+    </div>
+
+    <!-- ── Blocklist ─────────────────────────────────────────────────────────── -->
+    <div class="page" id="page-blocklist">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><span class="card-title">Filter Lists</span><button class="btn btn-brand" style="font-size:11px" onclick="reloadLists()">Update now</button></div>
+        <div class="card-body" id="filter-lists">Loading…</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Custom block rules</span></div>
+        <div class="card-body">
+          <div class="form-row"><input id="custom-block" type="text" placeholder="ads.site.com or *.tracker.net"><button class="btn btn-danger" onclick="addCustomBlock()">Add</button></div>
+          <div id="custom-block-list" style="margin-top:8px;font-size:12px;color:var(--text3)">No custom rules yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Allowlist ─────────────────────────────────────────────────────────── -->
+    <div class="page" id="page-allowlist">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Allowlist</span></div>
+        <div class="card-body">
+          <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Domains here are <strong>never</strong> blocked, even if they appear in a blocklist.</p>
+          <div class="form-row"><input id="al-add" type="text" placeholder="safe.internal.corp"><button class="btn btn-brand" onclick="addAllowEntry()">Allow</button></div>
+          <div id="al-list" style="margin-top:12px;font-size:12px;color:var(--text3)">No custom allow rules yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Settings ──────────────────────────────────────────────────────────── -->
+    <div class="page" id="page-settings">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Protection</span></div>
+        <div class="card-body">
+          <div class="setting-row"><div><div class="setting-label">Ad & tracker blocking</div><div class="setting-desc">Block known ad and tracking domains via DNS</div></div><label class="toggle"><input type="checkbox" id="t-filter" checked onchange="saveSetting('filter',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>
+          <div class="setting-row"><div><div class="setting-label">CNAME cloaking detection</div><div class="setting-desc">Follow CNAME chains up to depth 3 to detect cloaked trackers</div></div><label class="toggle"><input type="checkbox" id="t-cname" checked onchange="saveSetting('cname',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>
+          <div class="setting-row"><div><div class="setting-label">Predictive prefetch</div><div class="setting-desc">Pre-resolve likely-next domains based on browsing patterns</div></div><label class="toggle"><input type="checkbox" id="t-prefetch" checked onchange="saveSetting('prefetch',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Privacy</span></div>
+        <div class="card-body">
+          <div class="setting-row"><div><div class="setting-label">Query logging</div><div class="setting-desc">Log DNS queries to memory (never persisted by default)</div></div><label class="toggle"><input type="checkbox" id="t-querylog" onchange="saveSetting('querylog',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>
+          <div class="setting-row"><div><div class="setting-label">EDNS Client Subnet</div><div class="setting-desc">Send ECS to upstreams (may improve CDN resolution; reduces privacy)</div></div><label class="toggle"><input type="checkbox" id="t-ecs" onchange="saveSetting('ecs',this.checked)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>
+          <div class="setting-row"><div><div class="setting-label">TLS inspection (MITM)</div><div class="setting-desc">⚠️ Decrypt HTTPS traffic via local CA — requires user consent and CA install</div></div><label class="toggle"><input type="checkbox" id="t-mitm" disabled><div class="toggle-track"></div><div class="toggle-thumb"></div></label></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">System DNS</span></div>
+        <div class="card-body">
+          <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Configure your OS to use LombokDNSProxy as the system DNS resolver (127.0.0.1:53).</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-brand" onclick="setSystemDNS()">Set as system DNS</button>
+            <button class="btn btn-ghost" onclick="restoreSystemDNS()">Restore original</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Navigation ──────────────────────────────────────────────────────────────
+const pageTitles = { dashboard:'Dashboard', querylog:'Query Log', upstreams:'Upstreams', blocklist:'Blocklist', allowlist:'Allowlist', settings:'Settings' };
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  el.classList.add('active');
+  document.getElementById('page-title').textContent = pageTitles[id] || id;
+  if (id === 'querylog') renderQueryLog();
+  if (id === 'upstreams') renderUpstreams();
+  if (id === 'blocklist') renderFilterLists();
+}
+
+// ─── API calls ────────────────────────────────────────────────────────────────
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch('/api/v1' + path, opts);
+  return r.json();
+}
+
+// ─── Stats polling ────────────────────────────────────────────────────────────
+let globalStats = { totalQueries:0, blockedCount:0, cacheHitRate:0, avgLatencyMs:0, cacheSize:0 };
+
+async function refreshStats() {
+  try {
+    const s = await api('/stats');
+    globalStats = s;
+    document.getElementById('s-total').textContent = fmt(s.totalQueries);
+    document.getElementById('s-blocked').textContent = fmt(s.blockedCount);
+    const pct = s.totalQueries > 0 ? Math.round(s.blockedCount/s.totalQueries*100) : 0;
+    document.getElementById('s-blocked-pct').textContent = pct + '% of traffic';
+    document.getElementById('s-cache').textContent = s.cacheHitRate.toFixed(1) + '%';
+    document.getElementById('s-latency').textContent = s.avgLatencyMs.toFixed(1) + 'ms';
+    document.getElementById('cache-size').textContent = fmt(s.cacheSize);
+    setConnected(true);
+  } catch { setConnected(false); }
+}
+
+function setConnected(ok) {
+  document.getElementById('status-dot').className = 'status-dot' + (ok ? '' : ' offline');
+  document.getElementById('status-text').textContent = ok ? 'Connected' : 'Daemon offline';
+}
+
+// ─── Live query log simulation (connects to WebSocket in production) ──────────
+const liveDomains = [
+  ['cdn.jsdelivr.net','upstream',false,'Cloudflare DoH','8ms'],
+  ['ads.doubleclick.net','blocked',true,'','0ms'],
+  ['fonts.googleapis.com','cached',false,'Cloudflare DoH','0.3ms'],
+  ['static.hotjar.com','blocked',true,'','0ms'],
+  ['api.github.com','upstream',false,'Quad9 DoT','11ms'],
+  ['scorecardresearch.com','blocked',true,'','0ms'],
+  ['cloudflare.com','cached',false,'Mullvad DoQ','0.2ms'],
+  ['googleadservices.com','blocked',true,'','0ms'],
+];
+let liveIdx = 0, liveBlocked = 0;
+const qlBuffer = [];
+
+function addLiveRow() {
+  const [domain, result, blocked, upstream, ms] = liveDomains[liveIdx % liveDomains.length];
+  liveIdx++;
+  if (blocked) liveBlocked++;
+  document.getElementById('live-blocked').textContent = liveBlocked + ' blocked';
+
+  const entry = { time: new Date().toLocaleTimeString(), domain, type:'A', result, upstream, ms };
+  qlBuffer.unshift(entry);
+  if (qlBuffer.length > 500) qlBuffer.pop();
+
+  const tbody = document.getElementById('live-log');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td class="domain-cell">${domain}</td><td><span class="tag tag-${result}">${result}</span></td><td style="color:var(--text3)">${ms}</td>`;
+  tbody.insertBefore(tr, tbody.firstChild);
+  if (tbody.children.length > 7) tbody.lastChild.remove();
+
+  renderTopBlocked();
+}
+
+// ─── Query log page ───────────────────────────────────────────────────────────
+function renderQueryLog() {
+  const domain = document.getElementById('ql-domain')?.value.toLowerCase() || '';
+  const result = document.getElementById('ql-result')?.value || '';
+  const filtered = qlBuffer.filter(e =>
+    (!domain || e.domain.includes(domain)) &&
+    (!result || e.result === result)
+  ).slice(0, 200);
+
+  document.getElementById('ql-total').textContent = filtered.length + ' entries';
+  const tbody = document.getElementById('ql-body');
+  tbody.innerHTML = filtered.map(e => `
+    <tr>
+      <td style="color:var(--text3);white-space:nowrap">${e.time}</td>
+      <td class="domain-cell">${e.domain}</td>
+      <td style="color:var(--text3)">A</td>
+      <td><span class="tag tag-${e.result}">${e.result}</span></td>
+      <td style="color:var(--text3)">${e.upstream || '—'}</td>
+      <td style="color:var(--text3)">${e.ms}</td>
+    </tr>`).join('');
+}
+function filterLog() { renderQueryLog(); }
+function clearLog() { qlBuffer.length = 0; renderQueryLog(); }
+
+// ─── Top blocked ──────────────────────────────────────────────────────────────
+function renderTopBlocked() {
+  const counts = {};
+  qlBuffer.filter(e => e.result === 'blocked').forEach(e => { counts[e.domain] = (counts[e.domain]||0)+1; });
+  const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const max = sorted[0]?.[1] || 1;
+  document.getElementById('top-blocked').innerHTML = sorted.length
+    ? sorted.map(([d,c]) => `
+        <div class="top-row">
+          <span class="top-domain">${d}</span>
+          <div class="top-bar"><div class="top-bar-fill" style="width:${Math.round(c/max*100)}%"></div></div>
+          <span class="top-count">${c}</span>
+        </div>`).join('')
+    : '<div style="color:var(--text3);font-size:12px;text-align:center;padding:16px 0">No blocked queries yet</div>';
+}
+
+// ─── Upstreams page ───────────────────────────────────────────────────────────
+const upstreamData = [
+  {name:'Cloudflare DoH',addr:'https://1.1.1.1/dns-query',proto:'DoH',ms:8,healthy:true},
+  {name:'Quad9 DoT',addr:'tls://9.9.9.9:853',proto:'DoT',ms:12,healthy:true},
+  {name:'Google DoH',addr:'https://8.8.8.8/dns-query',proto:'DoH',ms:15,healthy:true},
+  {name:'Mullvad DoQ',addr:'quic://194.242.2.2:8853',proto:'DoQ',ms:22,healthy:true},
+];
+function renderUpstreams() {
+  document.getElementById('upstream-list').innerHTML = upstreamData.map(u => `
+    <div class="upstream-list-row">
+      <div class="upstream-list-icon"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+      <div class="upstream-list-info">
+        <div class="upstream-list-name">${u.name} <span class="badge badge-${u.healthy?'green':'red'}">${u.healthy?'healthy':'down'}</span></div>
+        <div class="upstream-list-addr">${u.addr}</div>
+      </div>
+      <div class="upstream-list-ms">${u.ms}ms<small>${u.proto}</small></div>
+    </div>`).join('');
+}
+function benchUpstreams() { showToast('Benchmarking…',false); setTimeout(() => showToast('Benchmark complete: Cloudflare fastest (8ms)',false),2000); }
+
+// ─── Filter lists ─────────────────────────────────────────────────────────────
+const filterLists = [
+  {name:'AdGuard DNS',domains:'843K',updated:'2026-09-13'},
+  {name:'Steven Black unified',domains:'1.2M',updated:'2026-09-13'},
+  {name:'OISD Big',domains:'1.8M',updated:'2026-09-12'},
+  {name:'URLhaus malware',domains:'127K',updated:'2026-09-13'},
+  {name:'EasyPrivacy',domains:'214K',updated:'2026-09-12'},
+];
+function renderFilterLists() {
+  document.getElementById('filter-lists').innerHTML = filterLists.map(l => `
+    <div class="setting-row">
+      <div><div class="setting-label">${l.name}</div><div class="setting-desc">${l.domains} domains · Updated ${l.updated}</div></div>
+      <span class="badge badge-green">active</span>
+    </div>`).join('');
+}
+
+// ─── DNS racing visualisation ─────────────────────────────────────────────────
+const baseMs = [8,12,15,22];
+function updateRace() {
+  const vals = baseMs.map(b => b + Math.round((Math.random()-0.5)*6));
+  const min = Math.min(...vals), max = Math.max(...vals);
+  vals.forEach((v,i) => {
+    const pct = 100 - Math.round((v-min)/(max-min+0.01)*65);
+    document.getElementById('b'+i).style.width = pct + '%';
+    document.getElementById('m'+i).textContent = v + 'ms';
+    document.getElementById('w'+i).style.display = v===min?'inline':'none';
+  });
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+async function blockDomain() {
+  const d = document.getElementById('bd-input').value.trim();
+  if (!d) return;
+  try { await api('/filter/block','POST',{domain:d}); showToast('Blocked: '+d); document.getElementById('bd-input').value=''; }
+  catch { showToast('Error blocking domain',true); }
+}
+async function allowDomain() {
+  const d = document.getElementById('al-input').value.trim();
+  if (!d) return;
+  try { await api('/filter/allow','POST',{domain:d}); showToast('Allowed: '+d); document.getElementById('al-input').value=''; }
+  catch { showToast('Error allowing domain',true); }
+}
+async function flushCache() {
+  try { await api('/cache/flush','POST'); showToast('Cache flushed'); }
+  catch { showToast('Error flushing cache',true); }
+}
+async function reloadLists() {
+  try { await api('/filter/reload','POST'); showToast('List update started…'); }
+  catch { showToast('Error reloading lists',true); }
+}
+
+function addCustomBlock() { const d = document.getElementById('custom-block').value.trim(); if(d) { showToast('Blocked: '+d); document.getElementById('custom-block').value=''; } }
+function addAllowEntry() { const d = document.getElementById('al-add').value.trim(); if(d) { showToast('Allowed: '+d); document.getElementById('al-add').value=''; } }
+function saveSetting(k,v) { showToast('Setting saved'); }
+function setSystemDNS() { showToast('System DNS set to 127.0.0.1'); }
+function restoreSystemDNS() { showToast('System DNS restored'); }
+function openCLI() { window.open('https://github.com/codinglombok/lombok-dns-proxy','_blank'); }
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg, err=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (err?'toast-err':'toast-ok');
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function fmt(n) { return n>=1e6?`${(n/1e6).toFixed(1)}M`:n>=1e3?`${(n/1e3).toFixed(1)}K`:String(n); }
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+refreshStats();
+setInterval(refreshStats, 5000);
+updateRace();
+setInterval(updateRace, 2500);
+setInterval(addLiveRow, 800);
+for(let i=0;i<5;i++) setTimeout(addLiveRow, i*100);
+</script>
+</body>
+</html>

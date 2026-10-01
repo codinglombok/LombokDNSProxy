@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LombokDNSProxy — Options</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         font-size: 14px; color: #1a1a1a; background: #f8f9fa; padding: 32px; }
+  .container { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #6b7280; margin-bottom: 32px; }
+  .section { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+             padding: 20px 24px; margin-bottom: 16px; }
+  .section-title { font-size: 14px; font-weight: 600; margin-bottom: 16px;
+                   padding-bottom: 10px; border-bottom: 1px solid #f3f4f6; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #374151; }
+  .field input[type=text], .field textarea {
+    width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px;
+    font-size: 13px; font-family: 'SF Mono', monospace; background: #f9fafb; outline: none;
+  }
+  .field input:focus, .field textarea:focus { border-color: #1a7f5a; }
+  .field textarea { height: 120px; resize: vertical; }
+  .field .hint { font-size: 11px; color: #9ca3af; margin-top: 4px; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f3f4f6; }
+  .toggle-row:last-child { border: none; padding-bottom: 0; }
+  .toggle-label { font-size: 13px; color: #374151; }
+  .toggle-desc { font-size: 11px; color: #9ca3af; }
+  .toggle { position: relative; width: 40px; height: 22px; flex-shrink: 0; cursor: pointer; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; border-radius: 11px; background: #d1d5db; transition: background 0.2s; }
+  .toggle input:checked + .toggle-slider { background: #1a7f5a; }
+  .toggle-slider::after { content:''; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .toggle input:checked + .toggle-slider::after { transform: translateX(18px); }
+  .btn-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+  .btn { padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
+  .btn-primary { background: #1a7f5a; color: #fff; }
+  .btn-primary:hover { background: #085041; }
+  .btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+  .saved-msg { font-size: 12px; color: #1a7f5a; margin-top: 8px; display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>LombokDNSProxy</h1>
+  <p class="subtitle">Extension settings · Part of the Lombok Ecosystem</p>
+
+  <div class="section">
+    <div class="section-title">Daemon connection</div>
+    <div class="field">
+      <label>Daemon address</label>
+      <input type="text" id="daemon-addr" value="ws://127.0.0.1:7788/ext">
+      <div class="hint">WebSocket address of the local LombokDNSProxy daemon.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Protection</div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">Enable DNS-level blocking</div><div class="toggle-desc">Block ads and trackers via DNS (requires daemon)</div></div>
+      <label class="toggle"><input type="checkbox" id="toggle-dns" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">Enable network-level blocking</div><div class="toggle-desc">Block requests using declarativeNetRequest rules</div></div>
+      <label class="toggle"><input type="checkbox" id="toggle-dnr" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">Cosmetic filtering</div><div class="toggle-desc">Hide ad containers (CSS injection)</div></div>
+      <label class="toggle"><input type="checkbox" id="toggle-cosmetic" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div><div class="toggle-label">Show badge counter</div><div class="toggle-desc">Show blocked count on extension icon</div></div>
+      <label class="toggle"><input type="checkbox" id="toggle-badge" checked><span class="toggle-slider"></span></label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Custom blocklist</div>
+    <div class="field">
+      <label>Blocked domains (one per line)</label>
+      <textarea id="custom-block" placeholder="ads.mysite.com&#10;*.trackers.net"></textarea>
+      <div class="hint">These domains will always return NXDOMAIN.</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Custom allowlist</div>
+    <div class="field">
+      <label>Allowed domains (one per line)</label>
+      <textarea id="custom-allow" placeholder="safe.internal.corp&#10;my-printer.local"></textarea>
+      <div class="hint">These domains are never blocked, even if they appear on a blocklist.</div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="loadSettings()">Reset</button>
+    <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+  </div>
+  <p class="saved-msg" id="saved-msg">✓ Settings saved</p>
+</div>
+
+<script>
+function loadSettings() {
+  chrome.storage.sync.get({
+    daemonAddr: 'ws://127.0.0.1:7788/ext',
+    dnsBocking: true, dnrBlocking: true, cosmetic: true, badge: true,
+    customBlock: '', customAllow: '',
+  }, (s) => {
+    document.getElementById('daemon-addr').value = s.daemonAddr;
+    document.getElementById('toggle-dns').checked = s.dnsBlocking;
+    document.getElementById('toggle-dnr').checked = s.dnrBlocking;
+    document.getElementById('toggle-cosmetic').checked = s.cosmetic;
+    document.getElementById('toggle-badge').checked = s.badge;
+    document.getElementById('custom-block').value = s.customBlock;
+    document.getElementById('custom-allow').value = s.customAllow;
+  });
+}
+
+function saveSettings() {
+  const settings = {
+    daemonAddr: document.getElementById('daemon-addr').value.trim(),
+    dnsBlocking: document.getElementById('toggle-dns').checked,
+    dnrBlocking: document.getElementById('toggle-dnr').checked,
+    cosmetic: document.getElementById('toggle-cosmetic').checked,
+    badge: document.getElementById('toggle-badge').checked,
+    customBlock: document.getElementById('custom-block').value.trim(),
+    customAllow: document.getElementById('custom-allow').value.trim(),
+  };
+  chrome.storage.sync.set(settings, () => {
+    const msg = document.getElementById('saved-msg');
+    msg.style.display = 'block';
+    setTimeout(() => msg.style.display = 'none', 3000);
+    chrome.runtime.sendMessage({ type: 'SETTINGS_UPDATED', payload: settings });
+  });
+}
+
+loadSettings();
+</script>
+</body>
+</html>

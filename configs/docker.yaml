@@ -1,0 +1,55 @@
+# LombokDNSProxy — Docker Configuration Preset
+# Used by the official Docker image: codinglombok/lombok-dns-proxy:latest
+# Part of the Lombok Ecosystem · Apache 2.0 · @codinglombok
+
+dns:
+  listen: "0.0.0.0"           # bind all interfaces inside container
+  port: 53
+  dot_port: 853
+  cache_size: 50000
+
+racing:
+  enabled: true
+  max_upstreams: 4
+  timeout_ms: 3000
+
+upstreams:
+  - name: "Cloudflare DoH"
+    address: "https://1.1.1.1/dns-query"
+    protocol: "doh"
+    enabled: true
+  - name: "Google DoH"
+    address: "https://8.8.8.8/dns-query"
+    protocol: "doh"
+    enabled: true
+  - name: "Quad9 DoT"
+    address: "tls://9.9.9.9:853"
+    protocol: "dot"
+    enabled: true
+
+filter:
+  enabled: true
+  update_interval: 24h
+
+http_proxy:
+  enabled: true
+  listen: "0.0.0.0"
+  port: 7788
+
+socks5:
+  enabled: true
+  listen: "0.0.0.0"
+  port: 7789
+
+dashboard:
+  enabled: true
+  listen: "0.0.0.0"          # allow host access to dashboard
+  port: 7787
+
+log:
+  level: "info"
+  format: "json"             # structured JSON for container log aggregators
+  query_log: false
+
+system:
+  set_system_dns: false      # not applicable inside container

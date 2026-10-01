@@ -1,0 +1,22 @@
+# LombokDNSProxy — Logging Configuration Preset
+# Merge or override into default.yaml for detailed logging.
+# Part of the Lombok Ecosystem · Apache 2.0 · @codinglombok
+
+log:
+  level: "debug"
+  format: "console"            # human-readable output for development
+  file: ""                     # empty = stdout
+  query_log: true              # log every DNS query (privacy warning!)
+  query_log_max_age: 1h        # auto-purge query log entries older than 1h
+  query_log_fields:            # fields to include in each query log entry
+    - domain
+    - qtype
+    - result                   # blocked | cached | upstream
+    - upstream
+    - latency_ms
+    - client_ip
+
+# Structured log output example (JSON):
+# {"level":"info","ts":"2026-09-10T12:34:56Z","msg":"DNS query",
+#  "domain":"example.com.","qtype":"A","result":"upstream",
+#  "upstream":"Cloudflare DoH","latency_ms":9,"client_ip":"127.0.0.1"}

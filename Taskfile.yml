@@ -1,0 +1,255 @@
+# LombokDNSProxy — Taskfile.yml
+# Cross-platform build, test, lint, package, release
+# Usage: task <target>   (install: go install github.com/go-task/task/v3/cmd/task@latest)
+# Part of the Lombok Ecosystem · Apache 2.0 · @codinglombok
+
+version: '3'
+
+vars:
+  APP_NAME: lombok-dns-proxy
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null || echo "v0.0.0-dev"
+  BUILD_TIME:
+    sh: date -u +"%Y-%m-%dT%H:%M:%SZ"
+  LDFLAGS: >-
+    -X github.com/codinglombok/lombok-dns-proxy/internal/build.Version={{.VERSION}}
+    -X github.com/codinglombok/lombok-dns-proxy/internal/build.BuildTime={{.BUILD_TIME}}
+    -s -w
+  GO_PACKAGES: ./src/core/... ./src/proxy/... ./src/filter/... ./src/cli/...
+  EXT_DIR: src/browser-ext
+
+tasks:
+
+  # ─── Development ─────────────────────────────────────────────
+
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  dev:
+    desc: Run daemon in development mode (hot-reload via Air)
+    cmds:
+      - air -c .air.toml
+    env:
+      LOMBOK_DNS_LOG_LEVEL: debug
+      LOMBOK_DNS_PORT: "5353"
+
+  dev:ext:
+    desc: Watch-build browser extension (TypeScript)
+    dir: "{{.EXT_DIR}}"
+    cmds:
+      - npm run dev
+
+  # ─── Build ───────────────────────────────────────────────────
+
+  build:
+    desc: Build CLI binary for current OS/arch
+    cmds:
+      - go build -ldflags "{{.LDFLAGS}}" -o dist/{{.APP_NAME}} ./src/cli/main.go
+    generates:
+      - dist/{{.APP_NAME}}
+
+  build:all:
+    desc: Cross-compile for all supported platforms
+    cmds:
+      - task: build:linux-amd64
+      - task: build:linux-arm64
+      - task: build:darwin-amd64
+      - task: build:darwin-arm64
+      - task: build:windows-amd64
+      - task: build:linux-mips   # OpenWrt
+
+  build:linux-amd64:
+    cmds:
+      - GOOS=linux GOARCH=amd64 go build -ldflags "{{.LDFLAGS}}" -o dist/{{.APP_NAME}}-linux-amd64 ./src/cli/main.go
+
+  build:linux-arm64:
+    cmds:
+      - GOOS=linux GOARCH=arm64 go build -ldflags "{{.LDFLAGS}}" -o dist/{{.APP_NAME}}-linux-arm64 ./src/cli/main.go
+
+  build:darwin-amd64:
+    cmds:
+      - GOOS=darwin GOARCH=amd64 go build -ldflags "{{.LDFLAGS}}" -o dist/{{.APP_NAME}}-darwin-amd64 ./src/cli/main.go
+
+  build:darwin-arm64:
+    cmds:
+      - GOOS=darwin GOARCH=arm64 go build -ldflags "{{.LDFLAGS}}" -o dist/{{.APP_NAME}}-darwin-arm64 ./src/cli/main.go
+
+  build:windows-amd64:
+    cmds:
+      - GOOS=windows GOARCH=amd64 go build -ldflags "{{.LDFLAGS}}" -o dist/{{.APP_NAME}}-windows-amd64.exe ./src/cli/main.go
+
+  build:linux-mips:
+    cmds:
+      - GOOS=linux GOARCH=mipsle GOMIPS=softfloat go build -ldflags "{{.LDFLAGS}}" -o dist/{{.APP_NAME}}-linux-mipsle ./src/cli/main.go
+
+  build:gui:
+    desc: Build desktop GUI app (Wails v2)
+    dir: src/gui
+    cmds:
+      - wails build -platform {{OS}}/{{ARCH}} -ldflags "{{.LDFLAGS}}"
+
+  build:ext:
+    desc: Build browser extension (production)
+    dir: "{{.EXT_DIR}}"
+    cmds:
+      - npm ci
+      - npm run build
+    generates:
+      - "{{.EXT_DIR}}/dist/**"
+
+  # ─── Test ────────────────────────────────────────────────────
+
+  test:
+    desc: Run all unit tests with race detector
+    cmds:
+      - go test -race -count=1 -timeout 120s {{.GO_PACKAGES}} ./tests/...
+
+  test:short:
+    desc: Run tests excluding benchmarks (fast)
+    cmds:
+      - go test -short -race -count=1 {{.GO_PACKAGES}} ./tests/...
+
+  test:cover:
+    desc: Run tests with coverage report
+    cmds:
+      - go test -race -coverprofile=coverage.out -covermode=atomic {{.GO_PACKAGES}} ./tests/...
+      - go tool cover -html=coverage.out -o coverage.html
+      - echo "Coverage report → coverage.html"
+
+  bench:
+    desc: Run all benchmarks
+    cmds:
+      - go test -bench=. -benchmem -run=^$ {{.GO_PACKAGES}} ./tests/...
+
+  bench:resolver:
+    desc: Benchmark DNS resolver hot path
+    cmds:
+      - go test -bench=BenchmarkCache -benchmem -run=^$ ./tests/...
+
+  fuzz:filter:
+    desc: Fuzz the filter engine (run for 60s)
+    cmds:
+      - go test -fuzz=FuzzFilterIsBlocked -fuzztime=60s ./tests/...
+
+  fuzz:parser:
+    desc: Fuzz the LoadList parser (run for 60s)
+    cmds:
+      - go test -fuzz=FuzzLoadList -fuzztime=60s ./tests/...
+
+  # ─── Lint & Security ─────────────────────────────────────────
+
+  lint:
+    desc: Run golangci-lint
+    cmds:
+      - golangci-lint run --timeout 3m {{.GO_PACKAGES}} ./tests/...
+
+  lint:fix:
+    desc: Run golangci-lint with auto-fix
+    cmds:
+      - golangci-lint run --fix --timeout 3m {{.GO_PACKAGES}}
+
+  vet:
+    desc: Run go vet + staticcheck
+    cmds:
+      - go vet {{.GO_PACKAGES}} ./tests/...
+      - staticcheck {{.GO_PACKAGES}} ./tests/...
+
+  sec:
+    desc: Run gosec security scanner
+    cmds:
+      - gosec -quiet {{.GO_PACKAGES}} ./tests/...
+
+  ci:
+    desc: Full CI pipeline (lint + test + cover + sec)
+    cmds:
+      - task: vet
+      - task: lint
+      - task: sec
+      - task: test:cover
+
+  # ─── Filter lists ────────────────────────────────────────────
+
+  lists:update:
+    desc: Download and refresh all blocklists
+    cmds:
+      - mkdir -p lists/
+      - curl -sSL https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt -o lists/adguard.txt
+      - curl -sSL https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts -o lists/stevenblack.txt
+      - curl -sSL https://raw.githubusercontent.com/peterSomething/ad-and-tracking-blocking/master/Hosts-format.txt -o lists/peterlowe.txt
+      - curl -sSL https://urlhaus.abuse.ch/downloads/hostfile/ -o lists/urlhaus.txt
+      - curl -sSL https://big.oisd.nl/domainswild2 -o lists/oisd-big.txt
+      - echo "Lists updated → lists/"
+
+  lists:compile:
+    desc: Compile raw lists into binary trie (lists.bin)
+    cmds:
+      - go run ./scripts/compile_lists/main.go -input lists/ -output lists/blocklist.bin
+
+  # ─── Package ─────────────────────────────────────────────────
+
+  package:deb:
+    desc: Build .deb package (Linux)
+    deps: [build:linux-amd64]
+    cmds:
+      - scripts/package_deb.sh {{.VERSION}}
+
+  package:rpm:
+    desc: Build .rpm package (Linux)
+    deps: [build:linux-amd64]
+    cmds:
+      - scripts/package_rpm.sh {{.VERSION}}
+
+  package:dmg:
+    desc: Build .dmg installer (macOS)
+    deps: [build:gui]
+    cmds:
+      - scripts/package_dmg.sh {{.VERSION}}
+
+  package:msi:
+    desc: Build .msi installer (Windows)
+    deps: [build:windows-amd64]
+    cmds:
+      - scripts/package_msi.sh {{.VERSION}}
+
+  package:docker:
+    desc: Build and push Docker image
+    cmds:
+      - docker buildx build --platform linux/amd64,linux/arm64 -t codinglombok/lombok-dns-proxy:{{.VERSION}} -t codinglombok/lombok-dns-proxy:latest --push .
+
+  release:
+    desc: Full release via GoReleaser
+    cmds:
+      - goreleaser release --clean
+
+  release:dry:
+    desc: Dry-run release (no publish)
+    cmds:
+      - goreleaser release --snapshot --clean --skip=publish
+
+  # ─── Utilities ───────────────────────────────────────────────
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf dist/ coverage.out coverage.html
+      - rm -rf {{.EXT_DIR}}/dist/
+
+  install:tools:
+    desc: Install all dev tools
+    cmds:
+      - go install github.com/go-task/task/v3/cmd/task@latest
+      - go install github.com/air-verse/air@latest
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install honnef.co/go/tools/cmd/staticcheck@latest
+      - go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - go install github.com/goreleaser/goreleaser@latest
+      - npm install -g typescript
+      - echo "All dev tools installed"
+
+  upgrade:deps:
+    desc: Upgrade all Go dependencies
+    cmds:
+      - go get -u ./...
+      - go mod tidy
